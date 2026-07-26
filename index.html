@@ -200,16 +200,15 @@
 
 <script>
 // Versione dell'app — aggiorna qui il numero a ogni release.
-const VERSION = '0.96.1';
+const VERSION = '0.96.2';
 document.getElementById('ver').textContent = 'v' + VERSION;
 
 const SID = '1T9I0nPB5t2d1al6DyV5_fThe7nfItbx7grfr0LfhXEE';
 const GID = '91532399';
 
-// Se valorizzata, la dashboard legge i dati da questa Web App (Apps Script) che
-// legge il foglio PRIVATO al posto tuo. Lasciala vuota per leggere dal foglio
-// pubblico (gviz), come prima. Incolla qui l'URL /exec dello script pubblicato.
-const API_URL = 'https://script.google.com/macros/s/AKfycbyzsD74yKkYWVq6AdYt6sXUrZN7KvSq9tMhaHJPEhXZDP0xXclR9bTK9sbiBId3nqhw/exec';
+// La dashboard legge da una Netlify Function sullo stesso dominio (niente CORS).
+// La function, lato server, interroga l'Apps Script che legge il foglio privato.
+const API_URL = '/.netlify/functions/magazzino';
 
 // === Punto di taglio tra le due sezioni ===
 // Tutto ciò che sta da questa riga in giù (numerazione del foglio Google)
