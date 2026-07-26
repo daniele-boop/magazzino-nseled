@@ -195,9 +195,14 @@
 
 </div>
 
-<footer>Dashboard Magazzino NSELED Milano · Aggiornamento automatico ogni 5 min · Dati in tempo reale da Google Sheets</footer>
+<footer>Dashboard Magazzino NSELED Milano · Aggiornamento automatico ogni 5 min · Dati in tempo reale da Google Sheets<br>
+<span id="ver"></span> · © danapp 2026</footer>
 
 <script>
+// Versione dell'app — aggiorna qui il numero a ogni release.
+const VERSION = '0.95.1';
+document.getElementById('ver').textContent = 'v' + VERSION;
+
 const SID = '1T9I0nPB5t2d1al6DyV5_fThe7nfItbx7grfr0LfhXEE';
 const GID = '91532399';
 
