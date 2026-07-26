@@ -198,9 +198,10 @@
 
 <footer>Dashboard Magazzino NSELED Milano · Aggiornamento automatico ogni 5 min · Dati in tempo reale da Google Sheets</footer>
 
+<script src="magazzino-core.js"></script>
 <script>
 // Versione dell'app — aggiorna qui il numero a ogni release.
-const VERSION = '0.96.2';
+const VERSION = '0.97.0';
 document.getElementById('ver').textContent = 'v' + VERSION;
 
 const SID = '1T9I0nPB5t2d1al6DyV5_fThe7nfItbx7grfr0LfhXEE';
@@ -216,18 +217,8 @@ const API_URL = '/.netlify/functions/magazzino';
 // Se in futuro la riga si sposta, basta cambiare questo numero.
 const RIGA_SPARE = 378;
 
-// Voci da NON mostrare: parole di stato o note che nel foglio finiscono
-// nella colonna del codice e non sono veri articoli. Confronto esatto (maiuscole).
-// Nome (anche parziale) della prima categoria-etichetta che apre la sezione
-// Ricambi/Moduli: tutto ciò che nel foglio viene da qui in giù va nei Ricambi.
-// Modificabile in un attimo se il confine è un'altra categoria.
-const INIZIO_RICAMBI = 'LEDWALL INDOOR MODULI LED';
-
-const IGNORE = new Set([
-  'NUOVO', 'USATO', 'NOLEGGIO', 'RESO', 'SOSTITUZIONE',
-  'EX SHOWROOM', 'SHOWROOM', 'EX DEMO', 'DEMO',
-  'MANCANO VENTOLE', 'BASI PICCOLE'
-]);
+// Le costanti INIZIO_RICAMBI/IGNORE e la logica di parsing vivono nel motore
+// condiviso magazzino-core.js (window.NSEMag), usato anche dall'area riservata.
 
 let prods = [];
 let rawTable = null;
@@ -260,7 +251,11 @@ async function loadData() {
       if (!m) throw new Error('Risposta non valida dal foglio');
       table = JSON.parse(m[1]).table;
     }
-    parse(table);
+    rawTable = table;
+    prods = NSEMag.parseSheet(table);
+    updKPI();
+    filt();
+    maybeDebug();
     document.getElementById('upd').textContent = 'Aggiornato: ' + new Date().toLocaleTimeString('it-IT');
   } catch(e) {
     // Distingue il blocco del browser (apertura in locale) dagli altri errori
@@ -285,103 +280,6 @@ async function loadData() {
   }
 }
 
-function gv(c) {
-  if (!c) return '';
-  return (c.f != null) ? String(c.f) : (c.v != null ? String(c.v) : '');
-}
-
-function parse(table) {
-  rawTable = table;
-  const rows = table.rows || [];
-  const groups = [];               // categorie nell'ordine del foglio
-  const catByKey = new Map();       // dedup categorie (per codice o per nome contenitore)
-  let current = null;               // categoria aperta
-  let inSpare = false;
-
-  rows.forEach((row, idx) => {
-    if (!row || !row.c) return;
-    const rowNum = idx + 1;
-    const b = gv(row.c[1]).trim();
-    const c = gv(row.c[2]).trim();
-    const d = gv(row.c[3]).trim();
-    const e = gv(row.c[4]).trim();
-    const f = gv(row.c[5]).trim();
-
-    if (!b && !c && !d && !e && !f) return;
-
-    const mkCat = (name, code, isHeader) => {
-      const cat = {
-        name: (name || code || '—'),
-        code: (code || ''),
-        isHeader,
-        row: rowNum,
-        section: (inSpare || /^MOD-/i.test(code || '')) ? 'spare' : 'prod',
-        batches: []
-      };
-      groups.push(cat);
-      return cat;
-    };
-
-    const dl = d.toLowerCase();
-
-    // Riga di INTESTAZIONE categoria (D = "Condizione")
-    if (dl === 'condizione' || dl === 'quantità' || dl === 'quantita') {
-      // Etichetta colonne globale (ARTICOLO): è solo l'intestazione del foglio, non una categoria.
-      if (b.toUpperCase() === 'ARTICOLO') { current = null; return; }
-      // Etichetta vuota senza nome: divisore tecnico, da saltare.
-      if (!b && c.toUpperCase() === 'CODICE') { current = null; return; }
-
-      // Da qui in poi è sezione ricambi se questa testata è la categoria di confine.
-      if (b.toUpperCase().includes(INIZIO_RICAMBI.toUpperCase())) inSpare = true;
-
-      // Una testata può essere:
-      //  - categoria-prodotto con codice proprio (es. "Totem P3 INDOOR" / TTI305719)
-      //  - categoria-contenitore (es. "RENTAL", "VIDEO PROCESSORI") con C = "CODICE"
-      const isContainer = (c.toUpperCase() === 'CODICE');
-      const key = isContainer ? ('@' + b.toUpperCase()) : (c || b).toUpperCase();
-      if (catByKey.has(key)) {
-        current = catByKey.get(key);            // stessa categoria spezzata nel foglio: unisci
-      } else {
-        current = mkCat(b || c, isContainer ? '' : c, true);
-        catByKey.set(key, current);
-      }
-      return;
-    }
-
-    // Riga di magazzino valida (quantità numerica o condizione riconosciuta)
-    const qtyNum = parseFloat((f || '').replace(',', '.'));
-    const hasQty = (f !== '' && !isNaN(qtyNum));
-    const hasCond = /nuovo|usato|noleggio|reso|showroom/i.test(d);
-    if (!hasQty && !hasCond) return;
-    const qty = hasQty ? qtyNum : 0;
-    if (!b && !hasCond && qty === 0) return;   // salta i separatori vuoti
-
-    const batch = { bn: b, code: c, cond: d, loc: e, qty };
-
-    if (current) {
-      // Tutte le righe appartengono alla categoria aperta (come nel foglio)
-      current.batches.push(batch);
-    } else if (c) {
-      // Nessuna categoria attiva: raggruppo per codice (caso di sicurezza)
-      const key = c.toUpperCase();
-      let cat = catByKey.get(key);
-      if (!cat) { cat = mkCat(c, c, false); catByKey.set(key, cat); }
-      current = cat;
-      cat.batches.push(batch);
-    }
-  });
-
-  prods = groups.filter(g =>
-    g.batches.length > 0 &&
-    !IGNORE.has((g.code || '').toUpperCase().trim()) &&
-    !IGNORE.has((g.name || '').toUpperCase().trim())
-  );
-
-  updKPI();
-  filt();
-  maybeDebug();
-}
-
 // Diagnostica: apri la dashboard aggiungendo #debug all'URL per vedere
 // cosa restituisce Google attorno alla riga 378.
 function maybeDebug() {
@@ -401,7 +299,7 @@ function maybeDebug() {
   let body = '';
   for (let i = start; i < end; i++) {
     const c = (rows[i] && rows[i].c) || [];
-    const cells = [0,1,2,3,4,5,6,7].map(k => `<td>${esc(gv(c[k])) || '·'}</td>`).join('');
+    const cells = [0,1,2,3,4,5,6,7].map(k => `<td>${esc(NSEMag.gv(c[k])) || '·'}</td>`).join('');
     const hl = (i + 1) >= RIGA_SPARE ? ' style="background:#fff3e0"' : '';
     body += `<tr${hl}><td style="font-weight:700">${i+1}</td>${cells}</tr>`;
   }
@@ -410,9 +308,9 @@ function maybeDebug() {
   let labels = '';
   (rows || []).forEach((r, i) => {
     const cc = (r && r.c) || [];
-    const B = gv(cc[1]).trim(), C = gv(cc[2]).trim();
+    const B = NSEMag.gv(cc[1]).trim(), C = NSEMag.gv(cc[2]).trim();
     if (B.toUpperCase() === 'ARTICOLO' || C.toUpperCase() === 'CODICE') {
-      const bound = B.toUpperCase().includes(INIZIO_RICAMBI.toUpperCase());
+      const bound = B.toUpperCase().includes(NSEMag.INIZIO_RICAMBI.toUpperCase());
       labels += `<div style="${bound ? 'color:#e65100;font-weight:800' : 'color:#37474f'}">`
               + `riga ${i + 1}: ${esc(B || '(vuoto)')}${bound ? '  ⟵ INIZIO RICAMBI' : ''}</div>`;
     }
@@ -427,7 +325,7 @@ function maybeDebug() {
        Righe restituite da Google: <b>${total}</b> ·
        Riga più alta riconosciuta come prodotto: <b>${maxRow}</b> ·
        Voci in sezione spare/moduli: <b>${spareN}</b> ·
-       Confine ricambi: <b>"${INIZIO_RICAMBI}"</b>
+       Confine ricambi: <b>"${NSEMag.INIZIO_RICAMBI}"</b>
      </div>
      <div style="margin-bottom:6px;font-weight:700;color:#0d47a1">Testate di sezione trovate (in arancione quella che apre i Ricambi):</div>
      <div style="margin-bottom:14px;line-height:1.5;font-family:monospace">${labels || '(nessuna)'}</div>
