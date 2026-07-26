@@ -127,50 +127,58 @@ window.NSEMag = (function () {
   // codice. Aggiungere/correggere una serie = toccare SOLO le tabelle.
   // ===========================================================================
 
-  // --- TABELLA MODULI: codice modulo → { famiglia (dimensione fisica), passo } ---
-  // La "famiglia" lega il modulo ai cabinet compatibili. OSO è mappato ma spento
-  // (materiale in altro magazzino Visiva: si aggancerà in uno step separato).
-  const MODULI = {
-    // 250×250
-    'MOD-LWI19': { fam: '250x250', passo: '1.953' },
-    'MOD-LWI26': { fam: '250x250', passo: '2.604' },
-    'MOD-LWI29': { fam: '250x250', passo: '2.976' },
-    'MOD-LWI39': { fam: '250x250', passo: '3.91' },
-    // 320×160
-    'MOD-LWI12': { fam: '320x160', passo: '1.25' },
-    'MOD-LWI15': { fam: '320x160', passo: '1.53' },
-    'MOD-LWI16': { fam: '320x160', passo: '1.66' },
-    'MOD-LWI18': { fam: '320x160', passo: '1.86' },
-    'MOD-LWI20': { fam: '320x160', passo: '2.0' },
-    'MOD-LWI25': { fam: '320x160', passo: '2.5' },
-    // Superslim 300×168,75
-    'MOD-LIS12': { fam: '300x168', passo: '1.25' },
-    'MOD-LIS15': { fam: '300x168', passo: '1.56' },
-    'MOD-LIS18': { fam: '300x168', passo: '1.875' },
-    // OSO 320×160 — RINVIATO (magazzino Visiva). Mappato ma non attivo.
-    'MOD-OSO25': { fam: 'OSO', passo: '2.5', rinviato: true },
-    'MOD-OSO30': { fam: 'OSO', passo: '3.0', rinviato: true },
-    'MOD-OSO40': { fam: 'OSO', passo: '4.0', rinviato: true }
+  // Sigla passo (2 cifre nel codice) → passo reale.
+  const PASSO = {
+    '12':'1.25','15':'1.53','16':'1.667','18':'1.86','19':'1.953','20':'2.0',
+    '25':'2.5','26':'2.604','29':'2.976','30':'3.076','39':'3.91','40':'4.0','48':'4.8'
   };
+  // Sigle LWI che appartengono alla famiglia 320×160 (le altre LWI → 250×250).
+  const SIGLE_320 = new Set(['12','15','16','18','20','25','30','40']);
 
-  // --- TABELLA CABINET: codice cabinet → { dim, fam modulo, moduli/cabinet } ---
-  // moduli = null significa "distinta base da completare" (mostrato ma non calcolato).
-  const CABINET = {
-    'LWI5050': { dim: '500×500',   fam: '250x250', moduli: 4 },
-    'LWI5025': { dim: '500×250',   fam: '250x250', moduli: 2 },
-    'LWI1050': { dim: '1000×500',  fam: '250x250', moduli: 8 },
-    'LWI1025': { dim: '1000×250',  fam: '250x250', moduli: 4 },
-    'LWI6464': { dim: '640×640',   fam: '320x160', moduli: 8 },
-    'LWI6448': { dim: '640×480',   fam: '320x160', moduli: 6 },
-    'LWI3264': { dim: '320×640',   fam: '320x160', moduli: 4 },
-    'LWI9648': { dim: '960×480',   fam: '320x160', moduli: 9 },
-    'LIS6033': { dim: '600×337,5', fam: '300x168', moduli: 4 }   // Superslim (codice cabinet da confermare)
-  };
+  // Codice dimensione (2 cifre) → mm. Famiglia 250×250 usa moduli 250×250, quindi
+  // moduli per lato = mm/250. Vale per LWI (1050=1000×500) e rental verticale
+  // (5010=500×1000): conta l'area, il risultato è lo stesso.
+  const DIMMM = { '10':1000, '25':250, '50':500 };
+  function moduli250(dim4){ const a=DIMMM[dim4.slice(0,2)], b=DIMMM[dim4.slice(2,4)]; return (a&&b)?(a/250)*(b/250):null; }
+  function fmtDim(dim4){ const a=DIMMM[dim4.slice(0,2)], b=DIMMM[dim4.slice(2,4)]; return (a&&b)?(a+'×'+b):dim4; }
 
-  // Etichetta leggibile di una famiglia.
+  // Distinta base esplicita per le famiglie a modulo NON quadrato.
+  const MOD320  = { '6464':8, '6448':6, '3264':4, '9648':9 };   // 320×160
+  const DIM320  = { '6464':'640×640','6448':'640×480','3264':'320×640','9648':'960×480' };
+  const MOD_SLIM= { '6033':4 };                                  // Superslim 300×168,75
+
   const FAMIGLIA_LABEL = {
-    '250x250': '250×250', '320x160': '320×160', '300x168': '300×168,75 (Superslim)', 'OSO': 'OSO'
+    '250x250':'250×250 (LWI)', '320x160':'320×160', '300x168':'300×168,75 (Superslim)',
+    'RNI-S':'Rental RS', 'RNI-X':'Rental RX', 'RNI-F':'Rental Flexible',
+    'RNO-S':'Rental Outdoor RS', 'RNO-X':'Rental Outdoor RX', 'OSO':'OSO'
   };
+
+  // --- MODULI: codice base → {fam, passo} (GENERATO) ---
+  const MODULI = {};
+  (function(){
+    const add=(code,fam,passo,extra)=>{ MODULI[code]=Object.assign({fam,passo},extra||{}); };
+    // LWI indoor: famiglia dalla sigla (250×250 oppure 320×160)
+    Object.keys(PASSO).forEach(s=> add('MOD-LWI'+s, SIGLE_320.has(s)?'320x160':'250x250', PASSO[s]));
+    // Superslim
+    ['12','15','18'].forEach(s=> add('MOD-LIS'+s,'300x168',PASSO[s]));
+    // Rental indoor RS/RX (19,26,29,39) e Flexible (26,39) — scorte separate
+    ['19','26','29','39'].forEach(s=>{ add('MOD-RNI'+s+'S','RNI-S',PASSO[s]); add('MOD-RNI'+s+'X','RNI-X',PASSO[s]); });
+    ['26','39'].forEach(s=> add('MOD-RNI'+s+'F','RNI-F',PASSO[s]));
+    // Rental outdoor RS/RX (39,48)
+    ['39','48'].forEach(s=>{ add('MOD-RNO'+s+'S','RNO-S',PASSO[s]); add('MOD-RNO'+s+'X','RNO-X',PASSO[s]); });
+    // OSO — mappato ma RINVIATO (magazzino Visiva)
+    ['25','30','40'].forEach(s=> add('MOD-OSO'+s,'OSO',PASSO[s]||s,{rinviato:true}));
+  })();
+
+  // --- CABINET vuoti: codice → {dim, fam, moduli} (GENERATO) ---
+  // I cabinet vuoti rental (RNI/RNO) hanno un formato codice ancora da confermare;
+  // i finiti rental vengono comunque scomposti da scomponiFinito().
+  const CABINET = {};
+  (function(){
+    ['5050','5025','1050','1025'].forEach(d=> CABINET['LWI'+d]={dim:fmtDim(d),fam:'250x250',moduli:moduli250(d)});
+    Object.keys(MOD320).forEach(d=> CABINET['LWI'+d]={dim:DIM320[d],fam:'320x160',moduli:MOD320[d]});
+    Object.keys(MOD_SLIM).forEach(d=> CABINET['LWI'+d]={dim:'600×337,5',fam:'300x168',moduli:MOD_SLIM[d]});
+  })();
 
   // Estrae la batch dalla descrizione: la parola singola dopo "Batch".
   // Se "Batch" non c'è, usa la descrizione come identificativo (batch sconosciuta
@@ -182,50 +190,63 @@ window.NSEMag = (function () {
     return (String(descrizione || '').trim()) || '?';
   }
 
-  // Tecnologie di modulo che NON si mischiano tra loro (scorte separate):
-  // standard, GOB, HB. Stessa geometria (stessa distinta base), ma pool distinti.
-  const TECNOLOGIE = /-?(GOB|HB)$/i;
-
-  // Normalizza un codice modulo: unifica solo il LATO (L/R), che è intercambiabile.
-  // NON tocca GOB/HB, che restano scorte separate (es. MOD-LWI26L → MOD-LWI26,
-  // ma MOD-LWI19-GOB resta MOD-LWI19-GOB, distinto da MOD-LWI19).
-  function normModulo(code) {
-    let c = (code || '').toUpperCase().trim();
-    // stacco l'eventuale suffisso tecnologia, unifico L/R sulla base, poi riattacco
-    const t = TECNOLOGIE.exec(c);
-    const tech = t ? t[0].replace(/^-/, '') : '';       // "GOB" / "HB" / ""
-    let base = t ? c.slice(0, t.index) : c;
-    let prev;
-    do { prev = base; base = base.replace(/([LR])$/i, ''); } while (base !== prev);
-    return tech ? (base + '-' + tech) : base;
-  }
-
-  // Estrae il codice-modulo BASE (senza tecnologia) per cercarlo nella tabella MODULI.
-  function baseModulo(code) {
-    return (code || '').toUpperCase().trim().replace(TECNOLOGIE, '').replace(/([LR])$/i, '');
-  }
+  // Suffissi dei codici modulo. Il LATO (-L/-R) è intercambiabile → si unifica.
+  // La TECNOLOGIA (-GOB/-HB) NON si mischia → resta pool separato.
+  // Ordine reale nei codici: BASE[-GOB][-L/R]  (es. MOD-LWI15-GOB-L).
+  const RE_SIDE = /-?[LR]$/i;
+  const RE_TECH = /-?(GOB|HB)$/i;
 
   // Etichetta tecnologia leggibile ('' | 'GOB' | 'HB').
   function tecnologiaModulo(code) {
-    const t = TECNOLOGIE.exec((code || '').toUpperCase().trim());
+    const c = (code || '').toUpperCase().trim().replace(RE_SIDE, '');
+    const t = RE_TECH.exec(c);
     return t ? t[1].toUpperCase() : '';
   }
 
-  // Scompone un codice ledwall FINITO (LWI + passo(2) + dim(4), 6 cifre) nei suoi
-  // componenti: 1 cabinet vuoto + N moduli di quel passo, secondo la distinta base.
-  // Restituisce null se non è un finito riconoscibile.
+  // Identità del POOL: unifica il lato, mantiene la tecnologia.
+  // MOD-LWI26-L → MOD-LWI26 ; MOD-LWI19-GOB-R → MOD-LWI19-GOB.
+  function normModulo(code) {
+    let c = (code || '').toUpperCase().trim().replace(RE_SIDE, '');
+    const t = RE_TECH.exec(c);
+    const tech = t ? t[1].toUpperCase() : '';
+    const base = t ? c.slice(0, t.index) : c;
+    return tech ? (base + '-' + tech) : base;
+  }
+
+  // Codice-modulo BASE (senza lato né tecnologia) per la tabella MODULI.
+  function baseModulo(code) {
+    return (code || '').toUpperCase().trim().replace(RE_SIDE, '').replace(RE_TECH, '');
+  }
+
+  // Scompone un codice ledwall FINITO nei componenti (1 cabinet + N moduli),
+  // secondo la distinta base. Gestisce LWI, rental indoor (RNI) e outdoor (RNO).
+  // La tecnologia (GOB/HB) viene propagata al modulo. Restituisce null se non
+  // riconosciuto (es. Transparent, che ha passo doppio e distinta base propria).
   function scomponiFinito(code) {
     const rawFull = (code || '').toUpperCase().trim();
-    const tech = tecnologiaModulo(rawFull);          // GOB / HB / ''
-    const raw = rawFull.replace(TECNOLOGIE, '');      // tolgo la tecnologia dal finito
-    const m = /^LWI(\d{2})(\d{4})$/.exec(raw);       // 6 cifre = passo + dim
-    if (!m) return null;
-    const sigla = m[1], dim = m[2];
-    const codModulo = 'MOD-LWI' + sigla + (tech ? '-' + tech : '');  // pool con tecnologia
-    const codCabinet = 'LWI' + dim;                  // il cabinet è agnostico alla tecnologia
-    const cab = CABINET[codCabinet];
-    if (!cab || !MODULI['MOD-LWI' + sigla]) return null;   // componenti non mappati
-    return { cabinet: codCabinet, modulo: codModulo, moduliPerCab: cab.moduli };
+    const tech = tecnologiaModulo(rawFull);
+    const c = rawFull.replace(RE_SIDE, '').replace(RE_TECH, '');
+    const T = tech ? ('-' + tech) : '';
+    let m;
+    // LWI: LWI<sigla2><dim4>  (dim 4 cifre; la famiglia la dà il cabinet)
+    if ((m = /^LWI(\d{2})(\d{4})$/.exec(c))) {
+      const cab = CABINET['LWI' + m[2]], mod = 'MOD-LWI' + m[1];
+      if (!cab || !MODULI[mod]) return null;
+      return { cabinet: 'LWI' + m[2], modulo: mod + T, moduliPerCab: cab.moduli };
+    }
+    // Rental indoor: RNI<sigla2><dim4>-<serie>  serie S/X/F
+    if ((m = /^RNI(\d{2})(\d{4})-?([SXF])$/.exec(c))) {
+      const n = moduli250(m[2]), mod = 'MOD-RNI' + m[1] + m[3];
+      if (!n || !MODULI[mod]) return null;
+      return { cabinet: 'RNI' + m[2] + '-' + m[3], modulo: mod + T, moduliPerCab: n };
+    }
+    // Rental outdoor: RNO<sigla2><dim4>-<serie>  serie S/X
+    if ((m = /^RNO(\d{2})(\d{4})-?([SX])$/.exec(c))) {
+      const n = moduli250(m[2]), mod = 'MOD-RNO' + m[1] + m[3];
+      if (!n || !MODULI[mod]) return null;
+      return { cabinet: 'RNO' + m[2] + '-' + m[3], modulo: mod + T, moduliPerCab: n };
+    }
+    return null;
   }
 
   // Calcola, per ogni FAMIGLIA e passo, quanti ledwall completi si possono
@@ -366,7 +387,7 @@ window.NSEMag = (function () {
 
   // API pubblica del motore
   return {
-    VERSION_CORE: '1.5.0',
+    VERSION_CORE: '1.6.0',
     INIZIO_RICAMBI: INIZIO_RICAMBI,
     IGNORE: IGNORE,
     MODULI: MODULI,
@@ -374,6 +395,8 @@ window.NSEMag = (function () {
     gv: gv,
     parseSheet: parseSheet,
     estraiBatch: estraiBatch,
+    baseModulo: baseModulo,
+    tecnologiaModulo: tecnologiaModulo,
     scomponiFinito: scomponiFinito,
     calcolaDisponibilita: calcolaDisponibilita,
     aggregaInArrivo: aggregaInArrivo
