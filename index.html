@@ -122,6 +122,10 @@
   .ptab .cbuild.zero{color:#c62828}
   .plim{font-size:.64rem;color:#90a4ae;text-transform:uppercase}
   .plim.cabinet{color:#1565c0}.plim.moduli{color:#e65100}
+  .sbil{font-size:.66rem;margin-top:2px;font-weight:600;line-height:1.2}
+  .sbil.cab{color:#e65100}
+  .sbil.mod{color:#1565c0}
+  .sbil.ok{color:#9e9e9e;font-weight:400}
   .calcnote{margin:10px 2px 0;font-size:.74rem;color:#90a4ae}
   .calcwarn{margin:10px 2px 0;font-size:.76rem;color:#e65100;background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:8px 12px}
 </style>
@@ -235,7 +239,7 @@
 <script src="magazzino-core.js"></script>
 <script>
 // Versione dell'app — aggiorna qui il numero a ogni release.
-const VERSION = '0.99.0';
+const VERSION = '0.99.1';
 document.getElementById('ver').textContent = 'v' + VERSION;
 
 const SID = '1T9I0nPB5t2d1al6DyV5_fThe7nfItbx7grfr0LfhXEE';
@@ -400,12 +404,16 @@ function renderCalc() {
                   + `<td colspan="3" style="color:#e65100">distinta base da completare</td></tr>`;
           } else {
             const zero = c.costruibili === 0 ? ' zero' : '';
+            let sbil;
+            if (c.collo === 'cabinet' && c.cabinetMancanti > 0) sbil = `<div class="sbil cab">servono +${fmt(c.cabinetMancanti)} cabinet</div>`;
+            else if (c.collo === 'moduli' && c.moduliMancanti > 0) sbil = `<div class="sbil mod">servono +${fmt(c.moduliMancanti)} moduli</div>`;
+            else sbil = `<div class="sbil ok">in pari</div>`;
             rows += `<tr>
               <td>${esc(c.dim)} <span class="ccode">${esc(c.code)}</span></td>
               <td>${fmt(c.cabinet)}</td>
               <td>${fmt(c.schermiModuli)}</td>
               <td class="cbuild${zero}">${fmt(c.costruibili)}</td>
-              <td><span class="plim ${c.collo}">${c.collo}</span></td>
+              <td><span class="plim ${c.collo}">${c.collo}</span>${sbil}</td>
             </tr>`;
           }
         });
