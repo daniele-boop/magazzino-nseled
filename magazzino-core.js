@@ -181,9 +181,16 @@ window.NSEMag = (function () {
     return (String(descrizione || '').trim()) || '?';
   }
 
-  // Normalizza un codice modulo togliendo l'eventuale suffisso L/R (unificati).
+  // Normalizza un codice modulo togliendo i suffissi tecnologici/lato che non
+  // cambiano la compatibilità: L/R (lato) e GOB (tecnologia). Aggiungere qui
+  // eventuali altri suffissi futuri.
+  const SUFFISSI_MODULO = /(GOB|[LR])$/i;
   function normModulo(code) {
-    return (code || '').toUpperCase().trim().replace(/([LR])$/, m => (m === 'L' || m === 'R') ? '' : m);
+    let c = (code || '').toUpperCase().trim();
+    // rimuovo in cascata (es. "MOD-LWI26GOBL" → "MOD-LWI26")
+    let prev;
+    do { prev = c; c = c.replace(SUFFISSI_MODULO, ''); } while (c !== prev);
+    return c;
   }
 
   // Calcola, per ogni FAMIGLIA e passo, quanti ledwall completi si possono
@@ -253,7 +260,12 @@ window.NSEMag = (function () {
             .reduce((s, k) => s + Math.floor(mod.batches[k] / cab.moduli), 0);
           const costruibili = Math.min(cab.stock, schermiModuli);
           const collo = cab.stock <= schermiModuli ? 'cabinet' : 'moduli';
-          return { code: cab.code, dim: cab.dim, cabinet: cab.stock, richiesti: cab.moduli, schermiModuli, costruibili, collo };
+          // Sbilanciamento: quanto manca per usare TUTTO lo stock in eccesso.
+          //  - collo cabinet → mancano cabinet per montare i moduli avanzati
+          //  - collo moduli  → mancano moduli per riempire i cabinet vuoti (stima batch-aware)
+          const cabinetMancanti = collo === 'cabinet' ? (schermiModuli - cab.stock) : 0;
+          const moduliMancanti  = collo === 'moduli'  ? (cab.stock - schermiModuli) * cab.moduli : 0;
+          return { code: cab.code, dim: cab.dim, cabinet: cab.stock, richiesti: cab.moduli, schermiModuli, costruibili, collo, cabinetMancanti, moduliMancanti };
         });
         return { code: mod.code, passo: mod.passo, batches: mod.batches, moduliTotale: mod.totale, perCab };
       });
@@ -271,7 +283,7 @@ window.NSEMag = (function () {
 
   // API pubblica del motore
   return {
-    VERSION_CORE: '1.2.0',
+    VERSION_CORE: '1.3.0',
     INIZIO_RICAMBI: INIZIO_RICAMBI,
     IGNORE: IGNORE,
     MODULI: MODULI,
