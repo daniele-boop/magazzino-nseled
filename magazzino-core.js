@@ -157,6 +157,7 @@ window.NSEMag = (function () {
   // moduli = null significa "distinta base da completare" (mostrato ma non calcolato).
   const CABINET = {
     'LWI5050': { dim: '500×500',   fam: '250x250', moduli: 4 },
+    'LWI5025': { dim: '500×250',   fam: '250x250', moduli: 2 },
     'LWI1050': { dim: '1000×500',  fam: '250x250', moduli: 8 },
     'LWI1025': { dim: '1000×250',  fam: '250x250', moduli: 4 },
     'LWI6464': { dim: '640×640',   fam: '320x160', moduli: 8 },
@@ -181,16 +182,50 @@ window.NSEMag = (function () {
     return (String(descrizione || '').trim()) || '?';
   }
 
-  // Normalizza un codice modulo togliendo i suffissi tecnologici/lato che non
-  // cambiano la compatibilità: L/R (lato) e GOB (tecnologia). Aggiungere qui
-  // eventuali altri suffissi futuri.
-  const SUFFISSI_MODULO = /(GOB|[LR])$/i;
+  // Tecnologie di modulo che NON si mischiano tra loro (scorte separate):
+  // standard, GOB, HB. Stessa geometria (stessa distinta base), ma pool distinti.
+  const TECNOLOGIE = /-?(GOB|HB)$/i;
+
+  // Normalizza un codice modulo: unifica solo il LATO (L/R), che è intercambiabile.
+  // NON tocca GOB/HB, che restano scorte separate (es. MOD-LWI26L → MOD-LWI26,
+  // ma MOD-LWI19-GOB resta MOD-LWI19-GOB, distinto da MOD-LWI19).
   function normModulo(code) {
     let c = (code || '').toUpperCase().trim();
-    // rimuovo in cascata (es. "MOD-LWI26GOBL" → "MOD-LWI26")
+    // stacco l'eventuale suffisso tecnologia, unifico L/R sulla base, poi riattacco
+    const t = TECNOLOGIE.exec(c);
+    const tech = t ? t[0].replace(/^-/, '') : '';       // "GOB" / "HB" / ""
+    let base = t ? c.slice(0, t.index) : c;
     let prev;
-    do { prev = c; c = c.replace(SUFFISSI_MODULO, ''); } while (c !== prev);
-    return c;
+    do { prev = base; base = base.replace(/([LR])$/i, ''); } while (base !== prev);
+    return tech ? (base + '-' + tech) : base;
+  }
+
+  // Estrae il codice-modulo BASE (senza tecnologia) per cercarlo nella tabella MODULI.
+  function baseModulo(code) {
+    return (code || '').toUpperCase().trim().replace(TECNOLOGIE, '').replace(/([LR])$/i, '');
+  }
+
+  // Etichetta tecnologia leggibile ('' | 'GOB' | 'HB').
+  function tecnologiaModulo(code) {
+    const t = TECNOLOGIE.exec((code || '').toUpperCase().trim());
+    return t ? t[1].toUpperCase() : '';
+  }
+
+  // Scompone un codice ledwall FINITO (LWI + passo(2) + dim(4), 6 cifre) nei suoi
+  // componenti: 1 cabinet vuoto + N moduli di quel passo, secondo la distinta base.
+  // Restituisce null se non è un finito riconoscibile.
+  function scomponiFinito(code) {
+    const rawFull = (code || '').toUpperCase().trim();
+    const tech = tecnologiaModulo(rawFull);          // GOB / HB / ''
+    const raw = rawFull.replace(TECNOLOGIE, '');      // tolgo la tecnologia dal finito
+    const m = /^LWI(\d{2})(\d{4})$/.exec(raw);       // 6 cifre = passo + dim
+    if (!m) return null;
+    const sigla = m[1], dim = m[2];
+    const codModulo = 'MOD-LWI' + sigla + (tech ? '-' + tech : '');  // pool con tecnologia
+    const codCabinet = 'LWI' + dim;                  // il cabinet è agnostico alla tecnologia
+    const cab = CABINET[codCabinet];
+    if (!cab || !MODULI['MOD-LWI' + sigla]) return null;   // componenti non mappati
+    return { cabinet: codCabinet, modulo: codModulo, moduliPerCab: cab.moduli };
   }
 
   // Calcola, per ogni FAMIGLIA e passo, quanti ledwall completi si possono
@@ -213,8 +248,9 @@ window.NSEMag = (function () {
           if (CABINET[raw]) cabStock[raw] = (cabStock[raw] || 0) + b.qty;
           else codiciIgnoti.cabinet.add(raw);
         } else if (/^MOD-/i.test(raw)) {
-          const code = normModulo(raw);
-          if (MODULI[code]) {
+          const code = normModulo(raw);      // identità pool (con tecnologia GOB/HB)
+          const base = baseModulo(raw);      // codice-base per la tabella MODULI
+          if (MODULI[base]) {
             modStock[code] = modStock[code] || {};
             const batch = estraiBatch(b.bn);
             modStock[code][batch] = (modStock[code][batch] || 0) + b.qty;
@@ -230,12 +266,13 @@ window.NSEMag = (function () {
     const ensureFam = f => famiglie[f] = famiglie[f] || { fam: f, label: FAMIGLIA_LABEL[f] || f, rinviato: false, moduli: [], cabinet: [] };
 
     Object.keys(modStock).forEach(code => {
-      const info = MODULI[code];
+      const info = MODULI[baseModulo(code)];
+      if (!info) return;
       const fam = ensureFam(info.fam);
       if (info.rinviato) fam.rinviato = true;
       const batches = modStock[code];
       const totale = Object.keys(batches).reduce((s, k) => s + batches[k], 0);
-      fam.moduli.push({ code, passo: info.passo, batches, totale });
+      fam.moduli.push({ code, passo: info.passo, tech: tecnologiaModulo(code), batches, totale });
     });
 
     Object.keys(cabStock).forEach(code => {
@@ -249,7 +286,7 @@ window.NSEMag = (function () {
     // costruibili = min( cabinet , Σ_batch ⌊moduli_batch / moduli_per_cabinet⌋ )
     const risultato = Object.keys(famiglie).map(f => {
       const fam = famiglie[f];
-      fam.moduli.sort((a, b) => parseFloat(a.passo) - parseFloat(b.passo));
+      fam.moduli.sort((a, b) => parseFloat(a.passo) - parseFloat(b.passo) || (a.tech || '').localeCompare(b.tech || ''));
       fam.cabinet.sort((a, b) => (a.moduli || 0) - (b.moduli || 0));
       const passi = fam.moduli.map(mod => {
         const perCab = fam.cabinet.map(cab => {
@@ -267,7 +304,7 @@ window.NSEMag = (function () {
           const moduliMancanti  = collo === 'moduli'  ? (cab.stock - schermiModuli) * cab.moduli : 0;
           return { code: cab.code, dim: cab.dim, cabinet: cab.stock, richiesti: cab.moduli, schermiModuli, costruibili, collo, cabinetMancanti, moduliMancanti };
         });
-        return { code: mod.code, passo: mod.passo, batches: mod.batches, moduliTotale: mod.totale, perCab };
+        return { code: mod.code, passo: mod.passo, tech: mod.tech || '', batches: mod.batches, moduliTotale: mod.totale, perCab };
       });
       return { fam: fam.fam, label: fam.label, rinviato: fam.rinviato, passi, cabinet: fam.cabinet };
     });
@@ -281,9 +318,55 @@ window.NSEMag = (function () {
     };
   }
 
+  // Aggrega le righe "in arrivo" (grezze da Odoo) a livello di COMPONENTE.
+  // Scompone i finiti con la distinta base, normalizza i codici modulo, e divide
+  // le quantità tra "warehouse" (magazzino, libere) e "cliente" (impegnate).
+  // Input: righe = [{ code, qty, eta, warehouse, ordine, riferimento }]
+  // Output: { arrivi: { codice → {warehouse, cliente, totale, etaMin, dettaglio[]} }, ignoti: [] }
+  function aggregaInArrivo(righe) {
+    const arrivi = {};
+    const ignoti = new Set();
+
+    const add = (code, qty, riga) => {
+      if (!code || !qty) return;
+      const a = arrivi[code] = arrivi[code] || { warehouse: 0, cliente: 0, totale: 0, etaMin: null, dettaglio: [] };
+      if (riga.warehouse) a.warehouse += qty; else a.cliente += qty;
+      a.totale += qty;
+      if (riga.eta && (!a.etaMin || riga.eta < a.etaMin)) a.etaMin = riga.eta;
+      a.dettaglio.push({
+        qty, eta: riga.eta || null, warehouse: !!riga.warehouse,
+        ordine: riga.ordine || '', riferimento: riga.riferimento || '', codiceOrdine: (riga.code || '')
+      });
+    };
+
+    (righe || []).forEach(riga => {
+      const raw = (riga.code || '').toUpperCase().trim();
+      const qty = Number(riga.qty) || 0;
+      if (!raw || qty <= 0) return;
+
+      const fin = scomponiFinito(raw);
+      if (fin) {                                   // finito → cabinet + moduli
+        add(fin.cabinet, qty, riga);
+        add(fin.modulo, qty * fin.moduliPerCab, riga);
+        return;
+      }
+      if (/^MOD-/i.test(raw)) {                     // modulo
+        const code = normModulo(raw);               // identità pool (con tecnologia)
+        if (MODULI[baseModulo(raw)]) add(code, qty, riga);
+        else ignoti.add(raw);
+        return;
+      }
+      if (CABINET[raw]) { add(raw, qty, riga); return; }   // cabinet vuoto noto
+      // altri LWI non riconosciuti → segnalati; codici non-ledwall (controller/spare) → ignorati
+      if (/^LWI\d/.test(raw)) ignoti.add(raw);
+    });
+
+    return { arrivi, ignoti: Array.from(ignoti) };
+  }
+
   // API pubblica del motore
   return {
-    VERSION_CORE: '1.3.0',
+    VERSION_CORE: '1.5.0',
     INIZIO_RICAMBI: INIZIO_RICAMBI,
     IGNORE: IGNORE,
     MODULI: MODULI,
@@ -291,7 +374,9 @@ window.NSEMag = (function () {
     gv: gv,
     parseSheet: parseSheet,
     estraiBatch: estraiBatch,
-    calcolaDisponibilita: calcolaDisponibilita
+    scomponiFinito: scomponiFinito,
+    calcolaDisponibilita: calcolaDisponibilita,
+    aggregaInArrivo: aggregaInArrivo
   };
 
 })();
