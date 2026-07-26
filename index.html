@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NSELED — Stock Check Milano</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',sans-serif;background:#f0f4f8;color:#1a237e}
+  header{background:#0d47a1;color:#fff;padding:14px 28px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 12px rgba(0,0,0,.2)}
+  .hlogo{display:flex;align-items:center;gap:12px}
+  .hico{width:38px;height:38px;background:#ff6f00;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:.9rem;color:#fff}
+  header h1{font-size:1.15rem;font-weight:700}
+  header small{font-size:.72rem;color:#90caf9;display:block}
+  .hright{display:flex;align-items:center;gap:10px}
+  .ldot{width:9px;height:9px;background:#69f0ae;border-radius:50%;animation:p 2s infinite}
+  @keyframes p{0%,100%{opacity:1}50%{opacity:.3}}
+  #upd{font-size:.75rem;color:#90caf9}
+  .btn{border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-weight:600;font-size:.82rem}
+  .btn-w{background:rgba(255,255,255,.15);color:#fff}
+  .btn-w:hover{background:rgba(255,255,255,.28)}
+  .kpis{background:#fff;padding:12px 28px;border-bottom:1px solid #e3eaf6;display:flex;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+  .kp{flex:1;text-align:center;padding:8px 12px;border-right:1px solid #e8eaf6}
+  .kp:last-child{border-right:none}
+  .kv{font-size:1.5rem;font-weight:800;color:#0d47a1}
+  .kl{font-size:.68rem;color:#90a4ae;text-transform:uppercase;letter-spacing:.4px}
+  .kp.g .kv{color:#2e7d32}.kp.r .kv{color:#c62828}.kp.o .kv{color:#e65100}
+  .toolbar{background:#fff;padding:12px 28px;border-bottom:2px solid #e3eaf6;display:flex;gap:10px;align-items:center;flex-wrap:wrap;box-shadow:0 2px 8px rgba(0,0,0,.07)}
+  .sw{position:relative;flex:1;min-width:200px}
+  .sw input{width:100%;padding:9px 12px 9px 34px;border:1.5px solid #e0e0e0;border-radius:7px;font-size:.88rem;outline:none;background:#fafafa;color:#1a237e;transition:border-color .2s}
+  .sw input:focus{border-color:#0d47a1;background:#fff}
+  .si{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#90a4ae}
+  .flt{padding:9px 11px;border:1.5px solid #e0e0e0;border-radius:7px;background:#fafafa;font-size:.83rem;color:#1a237e;outline:none;cursor:pointer}
+  .flt:focus{border-color:#0d47a1}
+  .btn-ea{background:#e8eaf6;color:#0d47a1;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:.8rem;font-weight:600;white-space:nowrap}
+  .btn-ea:hover{background:#c5cae9}
+  .cnt{margin-left:auto;background:#e8eaf6;color:#0d47a1;padding:5px 14px;border-radius:14px;font-size:.8rem;font-weight:700;white-space:nowrap}
+  .twrap{padding:20px 28px 50px}
+
+  /* Intestazione di sezione */
+  .sec{margin-bottom:34px}
+  .sechead{display:flex;align-items:center;gap:12px;margin:6px 2px 12px;padding-bottom:8px;border-bottom:2px solid #cdd9ee}
+  .sectitle{font-size:1.05rem;font-weight:800;color:#0d47a1;display:flex;align-items:center;gap:9px}
+  .secicon{font-size:1.15rem}
+  .secchip{background:#e8eaf6;color:#0d47a1;padding:3px 12px;border-radius:12px;font-size:.74rem;font-weight:700}
+  .secsub{margin-left:auto;font-size:.72rem;color:#90a4ae;font-weight:600}
+  .sec.spare .sectitle{color:#e65100}
+  .sec.spare .sechead{border-bottom-color:#ffcc80}
+  .sec.spare .secchip{background:#fff3e0;color:#e65100}
+  .sec.spare thead th{background:#e65100}
+  .sec.spare thead th:hover{background:#ef6c00}
+  .sec.spare tr.prow .pnm{color:#e65100}
+  .sec.spare tr.prow.open{background:#fff3e0}
+  .sec.spare tr.prow .arr{background:#ffe0b2;color:#e65100}
+  .sec.spare tr.prow.open .arr{background:#ffcc80;color:#bf360c}
+
+  table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 8px rgba(0,0,0,.08)}
+  thead th{background:#0d47a1;color:#fff;padding:11px 16px;font-size:.8rem;font-weight:600;text-align:left;white-space:nowrap;cursor:pointer;user-select:none}
+  thead th:hover{background:#1565c0}
+  thead th.sa::after{content:' ▲';font-size:.65em;opacity:.8}
+  thead th.sd::after{content:' ▼';font-size:.65em;opacity:.8}
+  tr.prow{background:#fff;cursor:pointer;transition:background .12s;border-bottom:1px solid #e8edf6}
+  tr.prow:hover{background:#e8eaf6}
+  tr.prow.open{background:#e3f2fd}
+  tr.prow td{padding:12px 16px;font-size:.88rem;vertical-align:middle}
+  .pnm{font-weight:700;color:#0d47a1;display:flex;align-items:center;gap:9px}
+  .arr{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:#e8eaf6;color:#5c6bc0;font-size:.7rem;flex-shrink:0;transition:transform .22s}
+  tr.prow.open .arr{transform:rotate(90deg);background:#bbdefb;color:#0d47a1}
+  .pcd{font-family:monospace;font-size:.75rem;color:#5c6bc0;display:block;margin-top:2px}
+  .qtot{font-weight:800;font-size:.95rem;display:inline-block;padding:4px 16px;border-radius:7px;min-width:52px;text-align:center}
+  .qtot.z{background:#ffebee;color:#c62828;border:1px solid #ef9a9a}
+  .qtot.l{background:#fff3e0;color:#e65100;border:1px solid #ffcc80}
+  .qtot.ok{background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7}
+  tr.brow{display:none;background:#f5f9ff;border-bottom:1px solid #e3edf6}
+  tr.brow.vis{display:table-row}
+  tr.brow:hover{background:#e8f1fb}
+  tr.brow td{padding:8px 16px;font-size:.82rem;vertical-align:middle}
+  tr.brow td:first-child{padding-left:44px;color:#78909c;font-size:.78rem}
+  .bcd{font-family:monospace;font-size:.78rem;color:#1565c0}
+  .bloc{color:#78909c;font-size:.78rem}
+  .bq{font-weight:700;font-size:.88rem;text-align:center}
+  .bq.z{color:#c62828}.bq.l{color:#e65100}.bq.ok{color:#2e7d32}
+  tr.btot{display:none;background:#e3f2fd}
+  tr.btot.vis{display:table-row}
+  tr.btot td{padding:8px 16px 9px;font-size:.78rem;font-weight:700;color:#0d47a1;border-bottom:3px solid #0d47a1}
+  .sec.spare tr.btot{background:#fff3e0}
+  .sec.spare tr.btot td{color:#e65100;border-bottom-color:#e65100}
+  .pill{display:inline-block;padding:2px 9px;border-radius:9px;font-size:.72rem;font-weight:600}
+  .pn{background:#e8f5e9;color:#1b5e20}.pu{background:#fbe9e7;color:#bf360c}
+  .pnl{background:#f3e5f5;color:#6a1b9a}.px{background:#eceff1;color:#546e7a}
+  .erow td{text-align:center;padding:34px;color:#90a4ae;font-size:.9rem}
+  .err{background:#ffebee;border:1px solid #ef9a9a;border-radius:8px;padding:14px;color:#c62828;margin:20px 28px}
+  footer{text-align:center;padding:16px;color:#b0bec5;font-size:.72rem;border-top:1px solid #e8eaf6;margin-top:10px}
+  @media(max-width:700px){
+    .kpis{display:grid;grid-template-columns:1fr 1fr}
+    .twrap{padding:10px}
+    header{padding:10px 16px}
+    .toolbar{padding:10px 14px}
+    .sechead{flex-wrap:wrap}
+    .secsub{margin-left:0;width:100%}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hlogo">
+    <div class="hico">NS</div>
+    <div>
+      <h1>Magazzino Milano 2026</h1>
+      <small>NSELED — Dashboard Commerciali</small>
+    </div>
+  </div>
+  <div class="hright">
+    <div class="ldot"></div>
+    <span id="upd">Caricamento...</span>
+    <button class="btn btn-w" onclick="loadData()">↻ Aggiorna</button>
+  </div>
+</header>
+
+<div class="kpis">
+  <div class="kp">   <div class="kv" id="kp">—</div><div class="kl">Voci totali</div></div>
+  <div class="kp g"> <div class="kv" id="ka">—</div><div class="kl">Disponibili</div></div>
+  <div class="kp r"> <div class="kv" id="kz">—</div><div class="kl">Esauriti</div></div>
+  <div class="kp o"> <div class="kv" id="kt">—</div><div class="kl">Pz Totali</div></div>
+  <div class="kp">   <div class="kv" id="kb">—</div><div class="kl">Batch Totali</div></div>
+</div>
+
+<div class="toolbar">
+  <div class="sw">
+    <span class="si">🔍</span>
+    <input type="text" id="s" placeholder="Cerca prodotto, codice batch, ubicazione..." oninput="filt()">
+  </div>
+  <select class="flt" id="fc" onchange="filt()">
+    <option value="">Tutte le condizioni</option>
+    <option>NUOVO</option>
+    <option>USATO</option>
+    <option>NOLEGGIO</option>
+  </select>
+  <select class="flt" id="fq" onchange="filt()">
+    <option value="">Tutte le qty</option>
+    <option value="pos">Solo disponibili</option>
+    <option value="zero">Solo esauriti</option>
+  </select>
+  <button class="btn-ea" onclick="resetOrder()" title="Torna all'ordine del foglio Google">↕ Ordine foglio</button>
+  <button class="btn-ea" id="bea" onclick="expAll()">▼ Espandi tutto</button>
+  <span class="cnt" id="cnt">— voci</span>
+</div>
+
+<div class="twrap">
+
+  <!-- SEZIONE 1: PRODOTTI -->
+  <div class="sec" id="secProd">
+    <div class="sechead">
+      <div class="sectitle"><span class="secicon">📦</span>Prodotti</div>
+      <span class="secchip" id="cntProd">—</span>
+      <span class="secsub">Totem, video wall e prodotti finiti</span>
+    </div>
+    <table id="tblProd">
+      <thead>
+        <tr>
+          <th onclick="srt(0,'prod')">Prodotto</th>
+          <th onclick="srt(1,'prod')">Codice</th>
+          <th onclick="srt(2,'prod')" style="text-align:center">N° Batch</th>
+          <th onclick="srt(3,'prod')" style="text-align:center">Qty Totale</th>
+        </tr>
+      </thead>
+      <tbody id="tbProd">
+        <tr class="erow"><td colspan="4">⏳ Caricamento dati dal magazzino...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- SEZIONE 2: RICAMBI / MODULI / SPARE -->
+  <div class="sec spare" id="secSpare">
+    <div class="sechead">
+      <div class="sectitle"><span class="secicon">🔧</span>Ricambi, Moduli &amp; Spare</div>
+      <span class="secchip" id="cntSpare">—</span>
+      <span class="secsub">Moduli LED, ricambi e spare parts</span>
+    </div>
+    <table id="tblSpare">
+      <thead>
+        <tr>
+          <th onclick="srt(0,'spare')">Voce</th>
+          <th onclick="srt(1,'spare')">Codice</th>
+          <th onclick="srt(2,'spare')" style="text-align:center">N° Batch</th>
+          <th onclick="srt(3,'spare')" style="text-align:center">Qty Totale</th>
+        </tr>
+      </thead>
+      <tbody id="tbSpare">
+        <tr class="erow"><td colspan="4">⏳ Caricamento...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<footer>Dashboard Magazzino NSELED Milano · Aggiornamento automatico ogni 5 min · Dati in tempo reale da Google Sheets</footer>
+
+<script>
+const SID = '1T9I0nPB5t2d1al6DyV5_fThe7nfItbx7grfr0LfhXEE';
+const GID = '91532399';
+
+// === Punto di taglio tra le due sezioni ===
+// Tutto ciò che sta da questa riga in giù (numerazione del foglio Google)
+// finisce nella sezione "Ricambi, Moduli & Spare".
+// Se in futuro la riga si sposta, basta cambiare questo numero.
+const RIGA_SPARE = 378;
+
+// Voci da NON mostrare: parole di stato o note che nel foglio finiscono
+// nella colonna del codice e non sono veri articoli. Confronto esatto (maiuscole).
+// Nome (anche parziale) della prima categoria-etichetta che apre la sezione
+// Ricambi/Moduli: tutto ciò che nel foglio viene da qui in giù va nei Ricambi.
+// Modificabile in un attimo se il confine è un'altra categoria.
+const INIZIO_RICAMBI = 'LEDWALL INDOOR MODULI LED';
+
+const IGNORE = new Set([
+  'NUOVO', 'USATO', 'NOLEGGIO', 'RESO', 'SOSTITUZIONE',
+  'EX SHOWROOM', 'SHOWROOM', 'EX DEMO', 'DEMO',
+  'MANCANO VENTOLE', 'BASI PICCOLE'
+]);
+
+let prods = [];
+let rawTable = null;
+// Stato di ordinamento per sezione. sc = -1 significa "ordine del foglio Google"
+// (default): le voci restano nella sequenza in cui compaiono nel foglio.
+const sortState = {
+  prod:  { sc: -1, sd: -1 },
+  spare: { sc: -1, sd: -1 }
+};
+let exAll = false;
+
+async function loadData() {
+  document.getElementById('upd').textContent = 'Aggiornamento...';
+  try {
+    // range=A1:F1000 forza Google a restituire TUTTE le righe (anche i moduli,
+    // che altrimenti vengono troncati) e legge solo le colonne A–F che ci servono.
+    // headers=0 -> table.rows[i] corrisponde alla riga (i+1) del foglio.
+    const url = `https://docs.google.com/spreadsheets/d/${SID}/gviz/tq?tqx=out:json&gid=${GID}&headers=0&range=A1:F1000`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status + (res.status === 403 ? ' — foglio non condiviso pubblicamente' : ''));
+    const txt = await res.text();
+    const m = txt.match(/google\.visualization\.Query\.setResponse\(([\s\S]*?)\);?\s*$/);
+    if (!m) throw new Error('Risposta non valida dal foglio');
+    const json = JSON.parse(m[1]);
+    parse(json.table);
+    document.getElementById('upd').textContent = 'Aggiornato: ' + new Date().toLocaleTimeString('it-IT');
+  } catch(e) {
+    // Distingue il blocco del browser (apertura in locale) dagli altri errori
+    const isFetchBlock = (e instanceof TypeError) || /failed to fetch|networkerror|load failed/i.test(e.message);
+    const local = location.protocol === 'file:';
+    let msg;
+    if (isFetchBlock && local) {
+      msg = `⚠️ Connessione bloccata dal browser.<br>
+        <small>Stai aprendo la dashboard come file locale (<b>file://</b>). Per motivi di sicurezza il browser
+        non permette di contattare Google da un file aperto col doppio clic. Carica la pagina su un indirizzo
+        <b>http/https</b> (vedi istruzioni).</small>`;
+    } else if (isFetchBlock) {
+      msg = `⚠️ Impossibile contattare Google (rete o CORS).<br>
+        <small>Verifica la connessione e che il foglio sia su "Chiunque abbia il link → Visualizzatore".</small>`;
+    } else {
+      msg = `⚠️ Errore: ${e.message}`;
+    }
+    document.getElementById('tbProd').innerHTML =
+      `<tr><td colspan="4"><div class="err">${msg}</div></td></tr>`;
+    document.getElementById('tbSpare').innerHTML = '';
+    document.getElementById('upd').textContent = 'Errore';
+  }
+}
+
+function gv(c) {
+  if (!c) return '';
+  return (c.f != null) ? String(c.f) : (c.v != null ? String(c.v) : '');
+}
+
+function parse(table) {
+  rawTable = table;
+  const rows = table.rows || [];
+  const groups = [];               // categorie nell'ordine del foglio
+  const catByKey = new Map();       // dedup categorie (per codice o per nome contenitore)
+  let current = null;               // categoria aperta
+  let inSpare = false;
+
+  rows.forEach((row, idx) => {
+    if (!row || !row.c) return;
+    const rowNum = idx + 1;
+    const b = gv(row.c[1]).trim();
+    const c = gv(row.c[2]).trim();
+    const d = gv(row.c[3]).trim();
+    const e = gv(row.c[4]).trim();
+    const f = gv(row.c[5]).trim();
+
+    if (!b && !c && !d && !e && !f) return;
+
+    const mkCat = (name, code, isHeader) => {
+      const cat = {
+        name: (name || code || '—'),
+        code: (code || ''),
+        isHeader,
+        row: rowNum,
+        section: (inSpare || /^MOD-/i.test(code || '')) ? 'spare' : 'prod',
+        batches: []
+      };
+      groups.push(cat);
+      return cat;
+    };
+
+    const dl = d.toLowerCase();
+
+    // Riga di INTESTAZIONE categoria (D = "Condizione")
+    if (dl === 'condizione' || dl === 'quantità' || dl === 'quantita') {
+      // Etichetta colonne globale (ARTICOLO): è solo l'intestazione del foglio, non una categoria.
+      if (b.toUpperCase() === 'ARTICOLO') { current = null; return; }
+      // Etichetta vuota senza nome: divisore tecnico, da saltare.
+      if (!b && c.toUpperCase() === 'CODICE') { current = null; return; }
+
+      // Da qui in poi è sezione ricambi se questa testata è la categoria di confine.
+      if (b.toUpperCase().includes(INIZIO_RICAMBI.toUpperCase())) inSpare = true;
+
+      // Una testata può essere:
+      //  - categoria-prodotto con codice proprio (es. "Totem P3 INDOOR" / TTI305719)
+      //  - categoria-contenitore (es. "RENTAL", "VIDEO PROCESSORI") con C = "CODICE"
+      const isContainer = (c.toUpperCase() === 'CODICE');
+      const key = isContainer ? ('@' + b.toUpperCase()) : (c || b).toUpperCase();
+      if (catByKey.has(key)) {
+        current = catByKey.get(key);            // stessa categoria spezzata nel foglio: unisci
+      } else {
+        current = mkCat(b || c, isContainer ? '' : c, true);
+        catByKey.set(key, current);
+      }
+      return;
+    }
+
+    // Riga di magazzino valida (quantità numerica o condizione riconosciuta)
+    const qtyNum = parseFloat((f || '').replace(',', '.'));
+    const hasQty = (f !== '' && !isNaN(qtyNum));
+    const hasCond = /nuovo|usato|noleggio|reso|showroom/i.test(d);
+    if (!hasQty && !hasCond) return;
+    const qty = hasQty ? qtyNum : 0;
+    if (!b && !hasCond && qty === 0) return;   // salta i separatori vuoti
+
+    const batch = { bn: b, code: c, cond: d, loc: e, qty };
+
+    if (current) {
+      // Tutte le righe appartengono alla categoria aperta (come nel foglio)
+      current.batches.push(batch);
+    } else if (c) {
+      // Nessuna categoria attiva: raggruppo per codice (caso di sicurezza)
+      const key = c.toUpperCase();
+      let cat = catByKey.get(key);
+      if (!cat) { cat = mkCat(c, c, false); catByKey.set(key, cat); }
+      current = cat;
+      cat.batches.push(batch);
+    }
+  });
+
+  prods = groups.filter(g =>
+    g.batches.length > 0 &&
+    !IGNORE.has((g.code || '').toUpperCase().trim()) &&
+    !IGNORE.has((g.name || '').toUpperCase().trim())
+  );
+
+  updKPI();
+  filt();
+  maybeDebug();
+}
+
+// Diagnostica: apri la dashboard aggiungendo #debug all'URL per vedere
+// cosa restituisce Google attorno alla riga 378.
+function maybeDebug() {
+  const old = document.getElementById('dbg');
+  if (old) old.remove();
+  if (!/debug/i.test(location.hash)) return;
+
+  const rows = (rawTable && rawTable.rows) || [];
+  const total = rows.length;
+  const spareN = prods.filter(p => p.section === 'spare').length;
+  const maxRow = prods.reduce((m, p) => Math.max(m, p.row), 0);
+
+  // Finestra attorno a 378 se i dati ci arrivano, altrimenti la coda
+  const start = total > 405 ? 369 : Math.max(0, total - 40);
+  const end   = total > 405 ? 405 : total;
+
+  let body = '';
+  for (let i = start; i < end; i++) {
+    const c = (rows[i] && rows[i].c) || [];
+    const cells = [0,1,2,3,4,5,6,7].map(k => `<td>${esc(gv(c[k])) || '·'}</td>`).join('');
+    const hl = (i + 1) >= RIGA_SPARE ? ' style="background:#fff3e0"' : '';
+    body += `<tr${hl}><td style="font-weight:700">${i+1}</td>${cells}</tr>`;
+  }
+
+  // Elenco delle testate di sezione (righe-etichetta ARTICOLO/CODICE)
+  let labels = '';
+  (rows || []).forEach((r, i) => {
+    const cc = (r && r.c) || [];
+    const B = gv(cc[1]).trim(), C = gv(cc[2]).trim();
+    if (B.toUpperCase() === 'ARTICOLO' || C.toUpperCase() === 'CODICE') {
+      const bound = B.toUpperCase().includes(INIZIO_RICAMBI.toUpperCase());
+      labels += `<div style="${bound ? 'color:#e65100;font-weight:800' : 'color:#37474f'}">`
+              + `riga ${i + 1}: ${esc(B || '(vuoto)')}${bound ? '  ⟵ INIZIO RICAMBI' : ''}</div>`;
+    }
+  });
+
+  const div = document.createElement('div');
+  div.id = 'dbg';
+  div.style.cssText = 'margin:0 28px 40px;padding:16px;background:#fff;border:2px solid #e65100;border-radius:10px;font-size:.74rem;overflow-x:auto';
+  div.innerHTML =
+    `<div style="font-weight:800;color:#e65100;margin-bottom:8px">🔧 DIAGNOSTICA</div>
+     <div style="margin-bottom:10px;color:#37474f">
+       Righe restituite da Google: <b>${total}</b> ·
+       Riga più alta riconosciuta come prodotto: <b>${maxRow}</b> ·
+       Voci in sezione spare/moduli: <b>${spareN}</b> ·
+       Confine ricambi: <b>"${INIZIO_RICAMBI}"</b>
+     </div>
+     <div style="margin-bottom:6px;font-weight:700;color:#0d47a1">Testate di sezione trovate (in arancione quella che apre i Ricambi):</div>
+     <div style="margin-bottom:14px;line-height:1.5;font-family:monospace">${labels || '(nessuna)'}</div>
+     <table style="width:100%;border-collapse:collapse">
+       <thead><tr style="background:#0d47a1;color:#fff">
+         <th style="padding:4px 8px">Riga</th><th>A</th><th>B</th><th>C</th>
+         <th>D</th><th>E</th><th>F</th><th>G</th><th>H</th>
+       </tr></thead>
+       <tbody>${body}</tbody>
+     </table>`;
+  document.querySelector('.twrap').appendChild(div);
+}
+
+function updKPI() {
+  const totQty = prods.reduce((s, p) => s + p.batches.reduce((a, b) => a + b.qty, 0), 0);
+  const av     = prods.filter(p => p.batches.reduce((a, b) => a + b.qty, 0) > 0).length;
+  const totB   = prods.reduce((s, p) => s + p.batches.length, 0);
+  document.getElementById('kp').textContent = prods.length;
+  document.getElementById('ka').textContent = av;
+  document.getElementById('kz').textContent = prods.length - av;
+  document.getElementById('kt').textContent = totQty;
+  document.getElementById('kb').textContent = totB;
+}
+
+function filt() {
+  const q  = document.getElementById('s').value.toLowerCase();
+  const fc = document.getElementById('fc').value.toUpperCase();
+  const fq = document.getElementById('fq').value;
+
+  let res = prods.map(p => {
+    let bs = p.batches.slice();
+    if (fc) bs = bs.filter(b => b.cond.toUpperCase() === fc);
+    if (fq === 'pos')  bs = bs.filter(b => b.qty > 0);
+    if (fq === 'zero') bs = bs.filter(b => b.qty === 0);
+
+    // Se un filtro condizione/quantità è attivo e non resta nessuna batch, escludi il prodotto
+    if ((fc || fq) && bs.length === 0) return null;
+
+    const nameMatch = !q || p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q);
+    const matching  = q ? bs.filter(b => b.bn.toLowerCase().includes(q) || b.code.toLowerCase().includes(q) || b.loc.toLowerCase().includes(q)) : bs;
+
+    if (q && !nameMatch && matching.length === 0) return null;
+
+    const disp = (q && !nameMatch) ? matching : bs;
+    if (disp.length === 0) return null;
+
+    return { ...p, batches: disp, tot: disp.reduce((s, b) => s + b.qty, 0) };
+  }).filter(Boolean);
+
+  const prod  = res.filter(p => p.section === 'prod');
+  const spare = res.filter(p => p.section === 'spare');
+  sortSec(prod,  'prod');
+  sortSec(spare, 'spare');
+
+  document.getElementById('cnt').textContent      = res.length + ' voci';
+  document.getElementById('cntProd').textContent  = prod.length + ' voci';
+  document.getElementById('cntSpare').textContent = spare.length + ' voci';
+
+  render(prod,  'tbProd',  'a');
+  render(spare, 'tbSpare', 'b');
+
+  if (exAll) {
+    document.querySelectorAll('tr.prow').forEach(r => r.classList.add('open'));
+    document.querySelectorAll('tr.brow, tr.btot').forEach(r => r.classList.add('vis'));
+  }
+}
+
+function sortSec(arr, sec) {
+  const st = sortState[sec];
+  if (st.sc < 0) return;
+  const keys = ['name', 'code', 'batches', 'tot'];
+  arr.sort((a, b) => {
+    let av = st.sc === 2 ? a.batches.length : st.sc === 3 ? a.tot : a[keys[st.sc]];
+    let bv = st.sc === 2 ? b.batches.length : st.sc === 3 ? b.tot : b[keys[st.sc]];
+    if (typeof av === 'number') return (av - bv) * st.sd;
+    return String(av).localeCompare(String(bv)) * st.sd;
+  });
+}
+
+function render(data, tbId, prefix) {
+  const tb = document.getElementById(tbId);
+  if (data.length === 0) {
+    tb.innerHTML = '<tr class="erow"><td colspan="4">Nessuna voce trovata.</td></tr>';
+    return;
+  }
+
+  let html = '';
+  data.forEach((p, i) => {
+    const tot = p.tot;
+    const qc  = tot === 0 ? 'z' : tot < 3 ? 'l' : 'ok';
+    const uid = prefix + i;
+
+    html += `<tr class="prow" onclick="toggleProd('${uid}')">
+      <td>
+        <div class="pnm"><span class="arr">▶</span>${esc(p.name)}</div>
+        <span class="pcd">${esc(p.code)}</span>
+      </td>
+      <td style="font-family:monospace;font-size:.8rem;color:#5c6bc0">${esc(p.code)}</td>
+      <td style="text-align:center;color:#78909c;font-size:.85rem">${p.batches.length}</td>
+      <td style="text-align:center"><span class="qtot ${qc}">${tot}</span></td>
+    </tr>`;
+
+    p.batches.forEach((b, j) => {
+      const bq = b.qty === 0 ? 'z' : b.qty < 3 ? 'l' : 'ok';
+      const pc = b.cond.toUpperCase() === 'NUOVO' ? 'pn'
+               : b.cond.toUpperCase().includes('USATO') ? 'pu'
+               : b.cond.toUpperCase() === 'NOLEGGIO' ? 'pnl' : 'px';
+      html += `<tr class="brow" data-uid="${uid}">
+        <td>${j + 1}.&nbsp; ${esc(b.bn || '')}</td>
+        <td class="bcd">${esc(b.code || '—')}</td>
+        <td><span class="pill ${pc}">${esc(b.cond || '—')}</span> <span class="bloc">${esc(b.loc || '—')}</span></td>
+        <td class="bq ${bq}">${b.qty}</td>
+      </tr>`;
+    });
+
+    html += `<tr class="btot" data-uid="${uid}">
+      <td colspan="3" style="text-align:right;padding-right:20px">
+        TOTALE <span style="font-size:.75rem;font-weight:400;color:#5c6bc0">(${p.batches.length} batch)</span>
+      </td>
+      <td style="text-align:center;font-size:1rem">${tot}</td>
+    </tr>`;
+  });
+
+  tb.innerHTML = html;
+}
+
+function toggleProd(uid) {
+  const prow = document.querySelector(`tr.prow:has(+ tr.brow[data-uid="${uid}"])`);
+  if (!prow) return;
+  const isOpen = prow.classList.toggle('open');
+  document.querySelectorAll(`tr.brow[data-uid="${uid}"], tr.btot[data-uid="${uid}"]`)
+    .forEach(r => r.classList.toggle('vis', isOpen));
+}
+
+function expAll() {
+  exAll = !exAll;
+  document.querySelectorAll('tr.prow').forEach(r => r.classList.toggle('open', exAll));
+  document.querySelectorAll('tr.brow, tr.btot').forEach(r => r.classList.toggle('vis', exAll));
+  document.getElementById('bea').textContent = exAll ? '▲ Chiudi tutto' : '▼ Espandi tutto';
+}
+
+function srt(col, sec) {
+  const st = sortState[sec];
+  if (st.sc === col) {
+    if (st.sd === -1) st.sd = 1;     // colonna già attiva: passa a crescente
+    else st.sc = -1;                 // poi torna all'ordine del foglio
+  } else {
+    st.sc = col; st.sd = -1;         // nuova colonna: decrescente
+  }
+
+  const tblId = sec === 'prod' ? 'tblProd' : 'tblSpare';
+  document.querySelectorAll(`#${tblId} thead th`).forEach((th, i) => {
+    th.classList.remove('sa', 'sd');
+    if (i === st.sc) th.classList.add(st.sd === 1 ? 'sa' : 'sd');
+  });
+  filt();
+}
+
+function resetOrder() {
+  sortState.prod.sc = -1;
+  sortState.spare.sc = -1;
+  document.querySelectorAll('thead th').forEach(th => th.classList.remove('sa', 'sd'));
+  filt();
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+loadData();
+setInterval(loadData, 5 * 60 * 1000);
+</script>
+</body>
+</html>
