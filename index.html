@@ -99,6 +99,31 @@
     .sechead{flex-wrap:wrap}
     .secsub{margin-left:0;width:100%}
   }
+
+  /* Ledwall costruibili */
+  .sec.calc .sectitle{color:#00695c}
+  .sec.calc .sechead{border-bottom-color:#80cbc4}
+  .famblock{margin-bottom:18px}
+  .famhead{font-weight:800;color:#004d40;font-size:.9rem;margin:4px 2px 8px;padding:3px 10px;background:#e0f2f1;border-radius:6px;display:inline-block}
+  .ccode{font-family:monospace;font-size:.68rem;color:#90a4ae}
+  .calcgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
+  .pcard{background:#fff;border:1px solid #e0e0e0;border-radius:10px;overflow:hidden;box-shadow:0 1px 6px rgba(0,0,0,.06)}
+  .phead{background:#e0f2f1;padding:10px 14px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+  .ppasso{font-weight:800;color:#00695c;font-size:1rem}
+  .ptag{font-family:monospace;font-size:.7rem;background:#00695c;color:#fff;padding:1px 7px;border-radius:9px}
+  .pmod{margin-left:auto;font-size:.78rem;color:#546e7a;font-weight:600}
+  .pbatch{padding:6px 14px;font-size:.72rem;color:#78909c;border-bottom:1px solid #eceff1;font-family:monospace}
+  .ptab{width:100%;border-collapse:collapse}
+  .ptab th{background:#f0f4f8;color:#546e7a;font-size:.68rem;text-transform:uppercase;letter-spacing:.3px;padding:6px 10px;text-align:right;font-weight:600}
+  .ptab th:first-child{text-align:left}
+  .ptab td{padding:7px 10px;font-size:.82rem;text-align:right;border-top:1px solid #eceff1}
+  .ptab td:first-child{text-align:left;font-weight:600;color:#37454f}
+  .ptab .cbuild{font-weight:800;font-size:.98rem;color:#00695c}
+  .ptab .cbuild.zero{color:#c62828}
+  .plim{font-size:.64rem;color:#90a4ae;text-transform:uppercase}
+  .plim.cabinet{color:#1565c0}.plim.moduli{color:#e65100}
+  .calcnote{margin:10px 2px 0;font-size:.74rem;color:#90a4ae}
+  .calcwarn{margin:10px 2px 0;font-size:.76rem;color:#e65100;background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:8px 12px}
 </style>
 </head>
 <body>
@@ -149,6 +174,15 @@
 </div>
 
 <div class="twrap">
+
+  <!-- SEZIONE 0: LEDWALL COSTRUIBILI (calcolo cabinet + moduli, batch-aware) -->
+  <div class="sec calc" id="secCalc">
+    <div class="sechead">
+      <div class="sectitle"><span class="secicon">🧮</span>Ledwall costruibili (LWI)</div>
+      <span class="secsub">cabinet + moduli, calcolo batch per batch</span>
+    </div>
+    <div id="calcBody"></div>
+  </div>
 
   <!-- SEZIONE 1: PRODOTTI -->
   <div class="sec" id="secProd">
@@ -201,7 +235,7 @@
 <script src="magazzino-core.js"></script>
 <script>
 // Versione dell'app — aggiorna qui il numero a ogni release.
-const VERSION = '0.97.0';
+const VERSION = '0.99.0';
 document.getElementById('ver').textContent = 'v' + VERSION;
 
 const SID = '1T9I0nPB5t2d1al6DyV5_fThe7nfItbx7grfr0LfhXEE';
@@ -254,6 +288,7 @@ async function loadData() {
     rawTable = table;
     prods = NSEMag.parseSheet(table);
     updKPI();
+    renderCalc();
     filt();
     maybeDebug();
     document.getElementById('upd').textContent = 'Aggiornato: ' + new Date().toLocaleTimeString('it-IT');
@@ -337,6 +372,70 @@ function maybeDebug() {
        <tbody>${body}</tbody>
      </table>`;
   document.querySelector('.twrap').appendChild(div);
+}
+
+function fmt(n) { return Number(n).toLocaleString('it-IT'); }
+
+// Disegna la sezione "Ledwall costruibili" usando il calcolo del motore condiviso.
+function renderCalc() {
+  const el = document.getElementById('calcBody');
+  if (!el || !window.NSEMag || !NSEMag.calcolaDisponibilita) return;
+  const d = NSEMag.calcolaDisponibilita(prods);
+
+  let html = '';
+  const attive = d.famiglie.filter(f => !f.rinviato && f.passi.length);
+  if (!attive.length) html += '<div class="calcnote">Nessun modulo LWI/LIS trovato per il calcolo.</div>';
+
+  attive.forEach(fam => {
+    html += `<div class="famblock"><div class="famhead">Famiglia ${esc(fam.label)}</div><div class="calcgrid">`;
+    fam.passi.forEach(p => {
+      const batchList = Object.keys(p.batches).map(k => `batch ${esc(k)}: ${fmt(p.batches[k])}`).join(' · ');
+      let rows = '';
+      if (!p.perCab.length) {
+        rows = `<tr><td colspan="5" style="text-align:center;color:#90a4ae">nessun cabinet compatibile a stock</td></tr>`;
+      } else {
+        p.perCab.forEach(c => {
+          if (c.richiesti == null) {
+            rows += `<tr><td>${esc(c.dim)} <span class="ccode">${esc(c.code)}</span></td><td>${fmt(c.cabinet)}</td>`
+                  + `<td colspan="3" style="color:#e65100">distinta base da completare</td></tr>`;
+          } else {
+            const zero = c.costruibili === 0 ? ' zero' : '';
+            rows += `<tr>
+              <td>${esc(c.dim)} <span class="ccode">${esc(c.code)}</span></td>
+              <td>${fmt(c.cabinet)}</td>
+              <td>${fmt(c.schermiModuli)}</td>
+              <td class="cbuild${zero}">${fmt(c.costruibili)}</td>
+              <td><span class="plim ${c.collo}">${c.collo}</span></td>
+            </tr>`;
+          }
+        });
+      }
+      html += `<div class="pcard">
+        <div class="phead">
+          <span class="ppasso">Passo ${esc(p.passo)}</span>
+          <span class="ptag">${esc(p.code)}</span>
+          <span class="pmod">Moduli: ${fmt(p.moduliTotale)}</span>
+        </div>
+        <div class="pbatch">${batchList || '—'}</div>
+        <table class="ptab">
+          <thead><tr><th>Cabinet</th><th>Stock</th><th>Moduli per</th><th>Costruibili</th><th>Limite</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+    });
+    html += '</div></div>';
+  });
+
+  const oso = d.famiglie.find(f => f.rinviato && f.passi.length);
+  if (oso) html += `<div class="calcnote">Famiglia OSO rilevata a magazzino ma <b>rinviata</b> (materiale nel magazzino Visiva): non calcolata in questa fase.</div>`;
+
+  const ign = [].concat(d.codiciIgnoti.cabinet, d.codiciIgnoti.moduli);
+  if (ign.length) {
+    html += `<div class="calcwarn">⚠️ Codici a stock non presenti nelle tabelle (non calcolati): ${esc(ign.join(', '))}. Se sono cabinet/moduli, dimmi famiglia e passo e li aggiungo.</div>`;
+  }
+  html += `<div class="calcnote">"Moduli per" = schermi possibili solo lato moduli, batch per batch. "Costruibili" = min(cabinet, moduli). I moduli di un passo alimentano più cabinet della stessa famiglia: le righe sono alternative.</div>`;
+
+  el.innerHTML = html;
 }
 
 function updKPI() {
