@@ -200,11 +200,16 @@
 
 <script>
 // Versione dell'app — aggiorna qui il numero a ogni release.
-const VERSION = '0.95.1';
+const VERSION = '0.96.1';
 document.getElementById('ver').textContent = 'v' + VERSION;
 
 const SID = '1T9I0nPB5t2d1al6DyV5_fThe7nfItbx7grfr0LfhXEE';
 const GID = '91532399';
+
+// Se valorizzata, la dashboard legge i dati da questa Web App (Apps Script) che
+// legge il foglio PRIVATO al posto tuo. Lasciala vuota per leggere dal foglio
+// pubblico (gviz), come prima. Incolla qui l'URL /exec dello script pubblicato.
+const API_URL = 'https://script.google.com/macros/s/AKfycbyzsD74yKkYWVq6AdYt6sXUrZN7KvSq9tMhaHJPEhXZDP0xXclR9bTK9sbiBId3nqhw/exec';
 
 // === Punto di taglio tra le due sezioni ===
 // Tutto ciò che sta da questa riga in giù (numerazione del foglio Google)
@@ -238,17 +243,25 @@ let exAll = false;
 async function loadData() {
   document.getElementById('upd').textContent = 'Aggiornamento...';
   try {
-    // range=A1:F1000 forza Google a restituire TUTTE le righe (anche i moduli,
-    // che altrimenti vengono troncati) e legge solo le colonne A–F che ci servono.
-    // headers=0 -> table.rows[i] corrisponde alla riga (i+1) del foglio.
-    const url = `https://docs.google.com/spreadsheets/d/${SID}/gviz/tq?tqx=out:json&gid=${GID}&headers=0&range=A1:F1000`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('HTTP ' + res.status + (res.status === 403 ? ' — foglio non condiviso pubblicamente' : ''));
-    const txt = await res.text();
-    const m = txt.match(/google\.visualization\.Query\.setResponse\(([\s\S]*?)\);?\s*$/);
-    if (!m) throw new Error('Risposta non valida dal foglio');
-    const json = JSON.parse(m[1]);
-    parse(json.table);
+    let table;
+    if (API_URL) {
+      // Foglio privato tramite Web App Apps Script: risposta JSON pulita.
+      const res = await fetch(API_URL);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const json = await res.json();
+      table = json.table;
+    } else {
+      // Foglio pubblico tramite gviz. range=A1:F1000 forza tutte le righe (colonne A–F),
+      // headers=0 allinea gli indici alle righe del foglio.
+      const url = `https://docs.google.com/spreadsheets/d/${SID}/gviz/tq?tqx=out:json&gid=${GID}&headers=0&range=A1:F1000`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('HTTP ' + res.status + (res.status === 403 ? ' — foglio non condiviso pubblicamente' : ''));
+      const txt = await res.text();
+      const m = txt.match(/google\.visualization\.Query\.setResponse\(([\s\S]*?)\);?\s*$/);
+      if (!m) throw new Error('Risposta non valida dal foglio');
+      table = JSON.parse(m[1]).table;
+    }
+    parse(table);
     document.getElementById('upd').textContent = 'Aggiornato: ' + new Date().toLocaleTimeString('it-IT');
   } catch(e) {
     // Distingue il blocco del browser (apertura in locale) dagli altri errori
