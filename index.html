@@ -111,6 +111,7 @@
   .phead{background:#e0f2f1;padding:10px 14px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
   .ppasso{font-weight:800;color:#00695c;font-size:1rem}
   .ptag{font-family:monospace;font-size:.7rem;background:#00695c;color:#fff;padding:1px 7px;border-radius:9px}
+  .ptech{font-size:.7rem;font-weight:800;background:#ff6f00;color:#fff;padding:1px 7px;border-radius:9px;letter-spacing:.3px}
   .pmod{margin-left:auto;font-size:.78rem;color:#546e7a;font-weight:600}
   .pbatch{padding:6px 14px;font-size:.72rem;color:#78909c;border-bottom:1px solid #eceff1;font-family:monospace}
   .ptab{width:100%;border-collapse:collapse}
@@ -239,7 +240,7 @@
 <script src="magazzino-core.js"></script>
 <script>
 // Versione dell'app — aggiorna qui il numero a ogni release.
-const VERSION = '0.99.2';
+const VERSION = '0.99.3';
 document.getElementById('ver').textContent = 'v' + VERSION;
 
 const SID = '1T9I0nPB5t2d1al6DyV5_fThe7nfItbx7grfr0LfhXEE';
@@ -421,6 +422,7 @@ function renderCalc() {
       html += `<div class="pcard">
         <div class="phead">
           <span class="ppasso">Passo ${esc(p.passo)}</span>
+          ${p.tech ? `<span class="ptech">${esc(p.tech)}</span>` : ''}
           <span class="ptag">${esc(p.code)}</span>
           <span class="pmod">Moduli: ${fmt(p.moduliTotale)}</span>
         </div>
